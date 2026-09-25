@@ -1,0 +1,193 @@
+services:
+  # ─────────────────────────────────────────────────────────
+  # Infrastructure
+  # ─────────────────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.0
+    container_name: schema-registry
+    depends_on:
+      - kafka
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092
+      SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: PLAINTEXT
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/subjects"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # ─────────────────────────────────────────────────────────
+  # Source Database (Postgres with logical replication for CDC)
+  # ─────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: production
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: appuser
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_replication_slots=10"
+      - "-c"
+      - "max_wal_senders=10"
+    volumes:
+      - ./cdc/init/postgres:/docker-entrypoint-initdb.d:ro
+
+  # ─────────────────────────────────────────────────────────
+  # Phase 1: Go Producer
+  # ─────────────────────────────────────────────────────────
+  producer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kafka-platform-producer:1.0.0
+    pull_policy: build
+    container_name: producer
+    depends_on:
+      kafka:
+        condition: service_started
+      schema-registry:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_TOPIC: user-events
+      KAFKA_ACKS: all
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      SCHEMA_PATH: /app/schemas/user_event.avsc
+      LOG_LEVEL: info
+      METRICS_ADDR: ":9090"
+      NUM_MESSAGES: "10"
+    ports:
+      - "9090:9090"
+
+  # ─────────────────────────────────────────────────────────
+  # Phase 2: Kafka Connect + Debezium
+  # ─────────────────────────────────────────────────────────
+  kafka-connect:
+    build:
+      context: ./cdc/connect
+      dockerfile: Dockerfile
+    image: kafka-connect-debezium:1.0.0
+    pull_policy: build
+    container_name: kafka-connect
+    depends_on:
+      kafka:
+        condition: service_started
+      schema-registry:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+    ports:
+      - "8083:8083"
+    environment:
+      CONNECT_GROUP_ID: debezium-connect-cluster
+      CONNECT_BOOTSTRAP_SERVERS: kafka:29092
+
+      CONNECT_CONFIG_STORAGE_TOPIC: debezium-connect-configs
+      CONNECT_OFFSET_STORAGE_TOPIC: debezium-connect-offsets
+      CONNECT_STATUS_STORAGE_TOPIC: debezium-connect-status
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "1"
+
+      CONNECT_KEY_CONVERTER: io.confluent.connect.avro.AvroConverter
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+
+      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
+      CONNECT_REST_PORT: "8083"
+
+      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components
+
+      CONNECT_ERRORS_TOLERANCE: all
+      CONNECT_ERRORS_LOG_ENABLE: "true"
+
+      KAFKA_HEAP_OPTS: "-Xms512M -Xmx1G"
+    volumes:
+      - ./cdc/connectors:/etc/kafka-connect/connectors:ro
+
+  # ─────────────────────────────────────────────────────────
+  # UIs
+  # ─────────────────────────────────────────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      kafka:
+        condition: service_started
+      schema-registry:
+        condition: service_healthy
+      kafka-connect:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: debezium
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://kafka-connect:8083
+
+  schema-registry-ui:
+    image: landoop/schema-registry-ui:latest
+    container_name: schema-registry-ui
+    depends_on:
+      - schema-registry
+    ports:
+      - "8000:8000"
+    environment:
+      SCHEMAREGISTRY_URL: http://schema-registry:8081
+      PROXY: "true"
+
+  kafka-connect-ui:
+    image: landoop/kafka-connect-ui:latest
+    container_name: kafka-connect-ui
+    depends_on:
+      - kafka-connect
+    ports:
+      - "8001:8000"
+    environment:
+      CONNECT_URL: http://kafka-connect:8083
+      PROXY: "true"

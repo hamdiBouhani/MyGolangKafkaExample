@@ -7,7 +7,7 @@ import (
 
 	"github.com/IBM/sarama"
 
-	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-producer/internal/config"
+	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-platform/internal/config"
 )
 
 func readSchema(path string) (string, error) {

@@ -66,21 +66,3 @@ services:
       SCHEMAREGISTRY_URL: http://schema-registry:8081
       PROXY: "true"
       
-  producer:
-    build:
-      context: ./kafka-producer
-    container_name: producer
-    depends_on:
-      - kafka
-      - schema-registry
-    environment:
-      KAFKA_BROKERS: kafka:29092
-      KAFKA_TOPIC: user-events
-      KAFKA_ACKS: all
-      SCHEMA_REGISTRY_URL: http://schema-registry:8081
-      SCHEMA_PATH: /app/schemas/user_event.avsc
-      LOG_LEVEL: info
-      METRICS_ADDR: ":9090"
-      NUM_MESSAGES: "10"
-    ports:
-      - "9090:9090"

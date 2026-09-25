@@ -1,15 +1,14 @@
 # ---------- build ----------
-FROM golang:1.22-alpine AS build
+FROM golang:1.27-alpine AS build
 WORKDIR /src
 
 RUN apk add --no-cache ca-certificates git
 
-COPY go.mod go.sum ./
-RUN go mod download
-
+# Copy everything including vendor/
 COPY . .
+
+# Build from vendored modules — no network, no proxy, no surprises
 RUN CGO_ENABLED=0 GOOS=linux go build \
-    -trimpath -ldflags="-s -w" \
     -o /out/producer ./cmd/producer
 
 # ---------- runtime ----------

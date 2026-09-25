@@ -13,3 +13,10 @@ curl http://localhost:9090/healthz
 
 # 4. Run tests
 go test ./...
+
+
+# Kafka Platform
+
+A complete streaming platform: Go Avro producer + Debezium CDC + (future) ksqlDB + ClickHouse.
+
+## Architecture

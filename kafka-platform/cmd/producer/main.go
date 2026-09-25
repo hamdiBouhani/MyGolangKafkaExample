@@ -13,9 +13,9 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-producer/internal/codec"
-	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-producer/internal/config"
-	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-producer/internal/producer"
+	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-platform/internal/codec"
+	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-platform/internal/config"
+	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-platform/internal/producer"
 )
 
 func main() {

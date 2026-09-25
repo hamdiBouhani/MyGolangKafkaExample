@@ -11,10 +11,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.uber.org/zap"
 
-	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-producer/internal/codec"
-	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-producer/internal/config"
-	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-producer/internal/schema"
-	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-producer/internal/wire"
+	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-platform/internal/codec"
+	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-platform/internal/config"
+	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-platform/internal/schema"
+	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-platform/internal/wire"
 )
 
 var (

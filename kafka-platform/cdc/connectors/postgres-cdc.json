@@ -1,0 +1,55 @@
+{
+  "name": "postgres-cdc-prod",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "debezium",
+    "database.password": "debezium",
+    "database.dbname": "production",
+
+    "topic.prefix": "prod_pg",
+    "table.include.list": "public.user_events",
+
+    "plugin.name": "pgoutput",
+    "publication.name": "debezium_prod_publication",
+    "slot.name": "debezium_prod_slot",
+    "slot.drop.on.stop": "false",
+
+    "snapshot.mode": "initial",
+    "snapshot.fetch.size": "10000",
+
+    "tombstones.on.delete": "true",
+    "decimal.handling.mode": "string",
+    "time.precision.mode": "connect",
+    "heartbeat.interval.ms": "10000",
+    "topic.heartbeat.prefix": "__debezium-heartbeat",
+
+    "poll.interval.ms": "500",
+    "max.batch.size": "2048",
+    "max.queue.size": "8192",
+
+    "transforms": "route,unwrap",
+    "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
+    "transforms.route.regex": "prod_pg\\.public\\.(.+)",
+    "transforms.route.replacement": "cdc.$1",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.delete.tombstone.handling.mode": "rewrite",
+    "transforms.unwrap.add.fields": "op,table,lsn,source.ts_ms",
+    "transforms.unwrap.add.headers": "source.ts_ms",
+
+    "errors.tolerance": "all",
+    "errors.log.enable": "true",
+    "errors.log.include.messages": "true",
+    "errors.deadletterqueue.topic.name": "cdc-dlq-postgres",
+    "errors.deadletterqueue.topic.replication.factor": "1",
+    "errors.deadletterqueue.context.headers.enable": "true",
+
+    "key.converter": "io.confluent.connect.avro.AvroConverter",
+    "key.converter.schema.registry.url": "http://schema-registry:8081",
+    "value.converter": "io.confluent.connect.avro.AvroConverter",
+    "value.converter.schema.registry.url": "http://schema-registry:8081"
+  }
+}

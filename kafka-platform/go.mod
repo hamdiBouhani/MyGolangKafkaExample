@@ -1,4 +1,4 @@
-module github.com/hamdiBouhani/MyGolangKafkaExample/kafka-producer
+module github.com/hamdiBouhani/MyGolangKafkaExample/kafka-platform
 
 go 1.27.1
 

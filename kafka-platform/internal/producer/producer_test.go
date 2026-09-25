@@ -9,8 +9,8 @@ import (
 	"github.com/IBM/sarama/mocks"
 	"go.uber.org/zap"
 
-	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-producer/internal/codec"
-	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-producer/internal/config"
+	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-platform/internal/codec"
+	"github.com/hamdiBouhani/MyGolangKafkaExample/kafka-platform/internal/config"
 )
 
 const testSchema = `{
