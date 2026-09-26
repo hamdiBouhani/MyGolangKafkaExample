@@ -145,6 +145,12 @@ services:
       CONNECT_ERRORS_LOG_ENABLE: "true"
 
       KAFKA_HEAP_OPTS: "-Xms512M -Xmx1G"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/connector-plugins"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 40s
     volumes:
       - ./cdc/connectors:/etc/kafka-connect/connectors:ro
 
@@ -191,3 +197,24 @@ services:
     environment:
       CONNECT_URL: http://kafka-connect:8083
       PROXY: "true"
+
+  # ─────────────────────────────────────────────────────────
+  # One-shot: deploy the Debezium connector once Connect is up
+  # ─────────────────────────────────────────────────────────
+  cdc-deployer:
+    build:
+      context: ./cdc
+      dockerfile: deploy/Dockerfile
+    image: cdc-deployer:1.0.0
+    pull_policy: build
+    container_name: cdc-deployer
+    depends_on:
+      kafka-connect:
+        condition: service_healthy
+    environment:
+      CONNECT_URL: http://kafka-connect:8083
+      CONNECTOR_FILE: /connectors/postgres-cdc.json
+      WAIT_TIMEOUT: "180"
+    volumes:
+      - ./cdc/connectors:/connectors:ro
+    restart: "no"     # run once and exit
